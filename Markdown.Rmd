@@ -1,0 +1,88 @@
+---
+title: "Practical Machine Learning Project"
+output: html_document
+---
+Objective: Produce an algorithm that can detect how well weight-lifting exercises are performed. 
+
+Dataset: The data comes from the Weight Lifting Exercise Dataset. The dataset includes data from accelerometers, gyroscopes, and magnetometers that were attached to the 6 participants belts, forearms, and arms, in addition to the dumbbell while the participants performed barbell lifts correctly and incorrectly in 5 different ways. The five different exercise specifications, identified as the "classe" in the dataset, include:
+
+- Class A: Doing exercise exactly according to specification.
+- Class B: Throwing the elbow to the front
+- Class C: Lifting the dumbbell only halfway
+- Class D: Lowering the dumbbell only halfway
+- Class E: Throwing the hips to the front
+
+The training dataset includes 19,216 observations and over 50 variables. The  variables include the "classe" variable, the variable to be predicted and over 40 covariates associated with the different activity measurements. The testing dataset includes 20 test cases.
+
+**Procedures**
+
+The training dataset was imported. A second dataset was created that excluded any variable with mostly missing data. Also, the summary rows included in the dataset were eliminated.
+
+```{r}
+
+training <- read.csv("pml-training.csv")
+dim(training)
+head(training[,c(1:8,160)])
+
+train.s <- training[training$new_window=='no',c(8:11,37:49,60:68,84:86,113:124,140,151:160)]
+dim(train.s)
+head(train.s[,c(1:8,52)])
+
+```
+
+Principal component analysis (PCA) was used to reduce the dimensionality of the training dataset and to produce linear combinations of the covariates that are uncorrelated between each other. However, before the principal component analysis could be performed, variables with zero variance (constant values) were eliminated from the dataset. Ten PCA components were needed to capture 80 percent of the variance.
+
+```{r}
+
+train.c <- train.s[,c(-3,-4,-14,-16,-17,-30,-31,-40,-42,-52)]
+dim(train.c)
+head(train.c[,c(1:8,42)])
+
+library("caret", lib.loc="~/R/win-library/3.1")
+preProc <- preProcess(train.c,method="pca",thresh=0.8)
+print(preProc)
+
+train.pca <- predict(preProc,train.c)
+head(train.pca)
+dim(train.pca)
+
+train.pca <- data.frame(train.s$classe,train.pca)
+names(train.pca)[1]="classe"
+dim(train.pca)
+head(train.pca)
+
+
+
+```
+**Bootstrap Aggregating and the K-Fold Cross Validation Methods**
+
+Bootrap Aggregating, also known as bagging was used to build the model. Bagging is used to improve the stability and accuracy of model. It can also reduce the variance of the results. In addition, the K-Fold Cross Validation method using 10 folds was used to estimate the accuracy for out of sample data. The cross validation results show that the out of sample accuracy should be around 95%
+
+```{r}
+
+train_control <- trainControl(method="cv",number=10,savePredictions = TRUE,returnResamp = "all")
+model.trbag <- train(classe ~.,data=train.pca, method="treebag",trControl=train_control)
+
+model.trbag[14]
+model.trbag[4]
+
+```
+The model was then applied to the testing dataset.
+```{r}
+testing <- read.csv("pml-testing.csv")
+dim(testing)
+
+test.s <- testing[testing$new_window=='no',c(8:11,37:49,60:68,84:86,113:124,140,151:159)]
+dim(test.s)
+
+test.c <- test.s[,c(-3,-4,-14,-16,-17,-30,-31,-40,-42,-52)]
+dim(test.c)
+
+test.pca <- predict(preProc,test.c)
+dim(test.pca)
+
+test_result <- predict(model.trbag,test.pca)
+test_result
+
+```
+
